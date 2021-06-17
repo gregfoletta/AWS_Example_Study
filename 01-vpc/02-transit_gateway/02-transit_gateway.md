@@ -57,5 +57,14 @@ VPC published requests to the transit gateway to CloudWatch in 60 second interva
 - Packets dropped to a blakchole
 - Packets dropped because they didn't have a route
 
-# DirectConnect
+# Examples
+
+Let's look at some real life examples of using a transit gateway.
+
+## Environment Setup
+
+You can find our environment setup in [this Terraform configuration file](transit_gateway.tf).
+
+Our environment consists 
+
 

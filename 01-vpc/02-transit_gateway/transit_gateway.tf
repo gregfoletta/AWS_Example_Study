@@ -3,14 +3,43 @@ provider "aws" {
 }
 
 
-# Two separate VPCs, prod and dev and shared
-### Dev VPC ### 
+### Set up the VPCs - Prod, Dev and Shared  ### 
+resource "aws_vpc" "prod" {
+  cidr_block       = "10.1.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "TGW Study - Prod"
+  }
+}
+
 resource "aws_vpc" "dev" {
   cidr_block       = "10.0.0.0/16"
   instance_tenancy = "default"
 
   tags = {
     Name = "TGW Study - Dev"
+  }
+}
+
+resource "aws_vpc" "shared" {
+  cidr_block       = "10.2.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "TGW Study - Shared"
+  }
+}
+
+### Set Up Route Tables and associations ###
+# Prod and Dev have one route table, and their association is a 'main' association
+# Shared has a front and back route table, with an association for each
+
+resource "aws_route_table" "prod" {
+  vpc_id = aws_vpc.prod.id
+
+  tags = {
+    Name = "TGW Study - Prod"
   }
 }
 
@@ -22,9 +51,61 @@ resource "aws_route_table" "dev" {
   }
 }
 
+resource "aws_route_table" "shared_front" {
+  vpc_id = aws_vpc.shared.id
+
+  tags = {
+    Name = "TGW Study - Shared - Front"
+  }
+}
+
+resource "aws_route_table" "shared_back" {
+  vpc_id = aws_vpc.shared.id
+
+  tags = {
+    Name = "TGW Study - Shared - Back"
+  }
+}
+
+resource "aws_main_route_table_association" "prod" {
+  vpc_id         = aws_vpc.prod.id
+  route_table_id = aws_route_table.prod.id
+}
+
 resource "aws_main_route_table_association" "dev" {
   vpc_id         = aws_vpc.dev.id
   route_table_id = aws_route_table.dev.id
+}
+
+resource "aws_route_table_association" "shared_front" {
+  subnet_id         = aws_subnet.shared_front.id
+  route_table_id = aws_route_table.shared_front.id
+}
+
+
+resource "aws_route_table_association" "shared_back" {
+  subnet_id         = aws_subnet.shared_back.id
+  route_table_id = aws_route_table.shared_back.id
+}
+
+### Subnets ###
+# Two subnets in each VPC
+resource "aws_subnet" "prod_a" {
+  vpc_id = aws_vpc.prod.id
+  cidr_block = "10.1.0.0/24"
+
+  tags = {
+    Name = "TGW Study - Prod - Subnet A"
+  }
+}
+
+resource "aws_subnet" "prod_b" {
+  vpc_id = aws_vpc.prod.id
+  cidr_block = "10.1.1.0/24"
+
+  tags = {
+    Name = "TGW Study - Prod- Subnet B"
+  }
 }
 
 resource "aws_subnet" "dev_a" {
@@ -45,75 +126,6 @@ resource "aws_subnet" "dev_b" {
   }
 }
 
-
-### Prod VPC ### 
-resource "aws_vpc" "prod" {
-  cidr_block       = "10.1.0.0/16"
-  instance_tenancy = "default"
-
-  tags = {
-    Name = "TGW Study - Prod"
-  }
-}
-
-resource "aws_route_table" "prod" {
-  vpc_id = aws_vpc.prod.id
-
-  tags = {
-    Name = "TGW Study - Prod"
-  }
-}
-
-resource "aws_main_route_table_association" "prod" {
-  vpc_id         = aws_vpc.prod.id
-  route_table_id = aws_route_table.prod.id
-}
-
-resource "aws_subnet" "prod_a" {
-  vpc_id = aws_vpc.prod.id
-  cidr_block = "10.1.0.0/24"
-
-  tags = {
-    Name = "TGW Study - Prod - Subnet A"
-  }
-}
-
-resource "aws_subnet" "prod_b" {
-  vpc_id = aws_vpc.prod.id
-  cidr_block = "10.1.1.0/24"
-
-  tags = {
-    Name = "TGW Study - Prod- Subnet B"
-  }
-}
-
-### Shared  VPC ### 
-resource "aws_vpc" "shared" {
-  cidr_block       = "10.2.0.0/16"
-  instance_tenancy = "default"
-
-  tags = {
-    Name = "TGW Study - Shared"
-  }
-}
-
-resource "aws_route_table" "shared_front" {
-  vpc_id = aws_vpc.shared.id
-
-  tags = {
-    Name = "TGW Study - Shared - Front"
-  }
-}
-
-resource "aws_route_table" "shared_back" {
-  vpc_id = aws_vpc.shared.id
-
-  tags = {
-    Name = "TGW Study - Shared - Back"
-  }
-}
-
-
 resource "aws_subnet" "shared_front" {
   vpc_id = aws_vpc.shared.id
   cidr_block = "10.2.0.0/24"
@@ -132,17 +144,9 @@ resource "aws_subnet" "shared_back" {
   }
 }
 
-resource "aws_route_table_association" "shared_front" {
-  subnet_id         = aws_subnet.shared_front.id
-  route_table_id = aws_route_table.shared_front.id
-}
 
 
-resource "aws_route_table_association" "shared_back" {
-  subnet_id         = aws_subnet.shared_back.id
-  route_table_id = aws_route_table.shared_back.id
-}
-
+### Internet Gateway ###
 resource "aws_internet_gateway" "shared_back" {
   vpc_id = aws_vpc.shared.id
 
@@ -151,6 +155,7 @@ resource "aws_internet_gateway" "shared_back" {
   }
 }
 
+### Routes ###
 resource "aws_route" "shared_back_igw" {
   route_table_id = aws_route_table.shared_back.id
   destination_cidr_block = "0.0.0.0/0"
